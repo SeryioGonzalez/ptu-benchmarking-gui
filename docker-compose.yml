@@ -1,0 +1,127 @@
+x-labels: &common_labels
+  labels:
+    - "app_group=az_oai_ptu_benchmarking_app"
+
+services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    <<: *common_labels
+    env_file:
+      - .env
+    environment:
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT}
+      - BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT=${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
+    networks:
+      - ptu_network
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    <<: *common_labels
+    env_file:
+      - .env
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GRAFANA_PORT=${GRAFANA_PORT}
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT}
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:$GRAFANA_PORT/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    ports:
+      - "${GRAFANA_PORT}:${GRAFANA_PORT}"
+    volumes:
+      - ./config/grafana/grafana_datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./config/grafana/grafana_dashboard_config.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
+      - ./config/grafana/grafana_dashboard.json:/etc/grafana/provisioning/dashboards/grafana_dashboard.json
+      - ./config/grafana/grafana_dashboard.v2.json:/etc/grafana/provisioning/dashboards/grafana_dashboard.v2.json
+      - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini
+    networks:
+      - ptu_network
+
+  streamlit_app:
+    build:
+      context: ./python/streamlit/
+      args:
+        STREAMLIT_PORT: ${STREAMLIT_PORT}
+    container_name: streamlit_app
+    <<: *common_labels
+    env_file:
+      - .env
+    environment:
+      - STREAMLIT_LOG_LEVEL=info
+      - STREAMLIT_PORT=${STREAMLIT_PORT}
+    depends_on:
+      grafana:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:$STREAMLIT_PORT/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    ports:
+      - "${STREAMLIT_PORT}:${STREAMLIT_PORT}"
+    networks:
+      - ptu_network
+
+  benchmark_paygo:
+    build:
+      context: ./python/azure-openai-benchmark
+      args:
+        API_PORT: ${BENCHMARK_TOOL_API_PORT}
+        PROMETHEUS_PORT: ${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
+    container_name: benchmark_paygo
+    <<: *common_labels
+    env_file:
+      - .env
+    environment:
+      - BENCHMARK_TOOL_API_PORT=${BENCHMARK_TOOL_API_PORT}
+      - BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT=${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
+    depends_on:
+      streamlit_app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:$BENCHMARK_TOOL_API_PORT/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - ptu_network
+
+  benchmark_ptu:
+    build:
+      context: ./python/azure-openai-benchmark
+      args:
+        API_PORT: ${BENCHMARK_TOOL_API_PORT}
+        PROMETHEUS_PORT: ${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
+    container_name: benchmark_ptu
+    <<: *common_labels
+    env_file:
+      - .env
+    environment:
+      - BENCHMARK_TOOL_API_PORT=${BENCHMARK_TOOL_API_PORT}
+      - BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT=${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
+    depends_on:
+      streamlit_app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:$BENCHMARK_TOOL_API_PORT/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - ptu_network
+
+networks:
+  ptu_network:
+    name: ptu_network
+    driver: bridge

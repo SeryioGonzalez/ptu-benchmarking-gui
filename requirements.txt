@@ -1,0 +1,12 @@
+argparse
+openai
+tiktoken
+numpy
+backoff
+wonderwords
+asyncio
+aiohttp
+pandas
+pillow
+ping3
+prometheus_client==0.21.1

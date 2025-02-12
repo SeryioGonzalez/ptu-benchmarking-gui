@@ -1,0 +1,190 @@
+import logging
+import os
+import requests
+import streamlit as st
+
+GRAFANA_DASHBOARD_UID = "ce977t8gv5czkb/ptu-benchmarking-v2"
+GRAFANA_PORT = os.getenv("GRAFANA_PORT")
+BENCHMARK_TOOL_API_PORT = os.getenv("BENCHMARK_TOOL_API_PORT")
+
+
+USE_DEFAULTS = True
+DEFAULT_ENDPOINT = "https://sergioazopenai.openai.azure.com/"
+DEFAULT_KEY = "f23ed9e95aa84102940416d101141762"
+DEFAULT_PAYGO_DEPLOYMENT = "gpt-4o-2024-11-20"
+DEFAULT_PTU_DEPLOYMENT = "gpt-4o-mini-2024-07-18"
+
+logging.basicConfig(
+    level=logging.INFO,  # Change to DEBUG for more detailed logs
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
+def start_benchmarks():
+    logger.debug(f"Starting benchmarks - PTU {st.session_state.ptu_status} - PAYGO {st.session_state.paygo_status}")
+    if not (st.session_state.ptu_status and st.session_state.paygo_status):
+        st.error("Check the configuration of the endpoints before starting the benchmarks.")
+        return
+
+    common_attributes = {
+        "replay_path": "prompts.json",
+        "context_generation_method": "reply",
+        "duration": st.session_state.experiment_data['duration'],
+        "rate": st.session_state.experiment_data['rpm']
+    }
+
+    payload_ptu = {
+        **common_attributes,
+        "api_base_endpoint": st.session_state.endpoint_ptu,
+        "deployment": st.session_state.deployment_ptu,
+        "api_key": st.session_state.api_key_ptu,
+    }
+
+    payload_paygo = {
+        **common_attributes,
+        "api_base_endpoint": st.session_state.endpoint_paygo,
+        "deployment": st.session_state.deployment_paygo,
+        "api_key": st.session_state.api_key_paygo,
+    }
+    
+    try:
+        response_ptu =   requests.post(f"http://benchmark_ptu:{BENCHMARK_TOOL_API_PORT}/load", json=payload_ptu, timeout=60)
+        response_paygo = requests.post(f"http://benchmark_paygo:{BENCHMARK_TOOL_API_PORT}/load", json=payload_paygo, timeout=60)
+        
+        if response_ptu.ok and response_paygo.ok:
+            st.success("Benchmarks started successfully!")
+        else:
+            error_messages = f"Benchmark 1 Error: {response_ptu.text if not response_ptu.ok else 'OK'}\n" \
+                             f"Benchmark 2 Error: {response_paygo.text if not response_paygo.ok else 'OK'}"
+            st.error(f"Error in launching benchmarks:\n{error_messages}")
+            return {"error": error_messages}
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error launching test: {e}")
+        return {"error": str(e)}
+
+def display_status(label, status, col):
+    """Display a configuration item with a green or red indicator, centered in the column."""
+    color = "green" if status else "red"
+    col.markdown(
+        f"""
+        <div style='display: flex; align-items: center; justify-content: center; margin: 10px 0;'>
+            <div style='width: 12px; height: 12px; border-radius: 50%; background-color: {color}; margin-right: 10px;'></div>
+            <span>{label}</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+def check_az_openai_endpoint_status(api_key, endpoint, deployment):
+    # Validate api_key
+    if not api_key:
+        return False
+
+    # Validate endpoint URL
+    if not endpoint:
+        return False
+    if not endpoint.startswith("https://"):
+        return False
+    
+    # Validate deployment name
+    if not deployment:
+        print("Validation failed: The deployment name is missing or empty.")
+        return False
+    
+    # Construct the URL
+    try:
+        url = (endpoint
+                + "/openai/deployments/"
+                + deployment
+                + "/chat/completions"
+                + "?api-version=2024-05-01-preview"
+            )
+    except Exception as e:
+        print(f"Validation failed: Error constructing the URL: {e}")
+        return False
+    
+    # Headers and body
+    model_check_headers = {
+        "api-key": api_key,
+        "Content-Type": "application/json",
+    }
+    model_check_body = {"messages": [{"content": "What is 1+1?", "role": "user"}]}
+    
+    # Validate endpoint response
+    try:
+        response = requests.post(url, headers=model_check_headers, json=model_check_body, timeout=10)
+        if response.status_code == 200:
+            return True
+        else:
+            # Log detailed response for debugging
+            print(f"Validation failed: {response.status_code}, {response.text}")
+            return False
+    except requests.exceptions.RequestException as e:
+        print(f"Validation failed: Failed to reach the endpoint. Error: {e}")
+        return False
+
+if "api_key_ptu" not in st.session_state:
+    st.session_state.api_key_ptu = ""
+    st.session_state.endpoint_ptu = ""
+    st.session_state.deployment_ptu = ""
+    st.session_state.ptu_status = False
+
+    st.session_state.api_key_paygo = ""
+    st.session_state.endpoint_paygo = ""
+    st.session_state.deployment_paygo = ""
+    st.session_state.paygo_status = False
+
+    st.session_state.experiment_data = {}
+    st.session_state.experiment_data["context_generation_method"] = "generate"
+    st.session_state.experiment_data["shape_profile"] = "custom"
+
+st.set_page_config(layout="wide")
+
+st.title("PTU Benchmarking")
+
+# 1) Collect configuration inputs
+with st.sidebar:
+    st.header("Azure OpenAI endpoint settings")
+
+    with st.expander("PTU Endpoint"):
+        st.session_state.api_key_ptu = st.text_input("AzOpenAI API Key - PTU", type="password", value=DEFAULT_KEY if USE_DEFAULTS else None)
+        st.session_state.endpoint_ptu = st.text_input("AzOpenAI Endpoint - PTU", value=DEFAULT_ENDPOINT if USE_DEFAULTS else None)
+        st.session_state.deployment_ptu = st.text_input("AzOpenAI Model Deployment - PTU", value=DEFAULT_PTU_DEPLOYMENT if USE_DEFAULTS else None)
+    
+    with st.expander('PAYGO Endpoint'):
+        st.session_state.api_key_paygo = st.text_input("AzOpenAI API Key - PAYGO", type="password", value=DEFAULT_KEY if USE_DEFAULTS else None)
+        st.session_state.endpoint_paygo = st.text_input("AzOpenAI Endpoint - PAYGO", value=DEFAULT_ENDPOINT if USE_DEFAULTS else None)
+        st.session_state.deployment_paygo = st.text_input("AzOpenAI Model Deployment - PAYGO", value=DEFAULT_PAYGO_DEPLOYMENT if USE_DEFAULTS else None)
+
+    col1, col2 = st.columns(2)
+
+    st.session_state.ptu_status   = check_az_openai_endpoint_status(st.session_state.api_key_ptu,   st.session_state.endpoint_ptu,   st.session_state.deployment_ptu)
+    st.session_state.paygo_status = check_az_openai_endpoint_status(st.session_state.api_key_paygo, st.session_state.endpoint_paygo, st.session_state.deployment_paygo)
+
+    display_status("PTU Endpoint",   st.session_state.ptu_status, col1)
+    display_status("PAYGO Endpoint", st.session_state.paygo_status, col2)
+
+    st.header("Benchmark configuration")
+    with st.expander('Config'):
+        st.session_state.experiment_data['duration'] = st.number_input("Experiment Duration (seconds)", min_value=30, value=30)
+        st.session_state.experiment_data['rpm']      = st.number_input("Requests per minute (0 is no limit)", min_value=0, max_value=100000, value=0)
+        
+        st.session_state.experiment_data['context_tokens'] = st.number_input("Prompt tokens per request", min_value=30, value=300)
+        st.session_state.experiment_data['max_tokens'] = st.number_input("Completion tokens per request", min_value=30, value=100)
+
+    if st.button("Run Benchmark"): 
+        if st.session_state.ptu_status and st.session_state.paygo_status:
+            start_benchmarks()
+        else:
+            st.warning("Please check the endpoint configuration before starting the benchmarks.")
+
+
+st.write("## Live Dashboard")
+
+dashboard_url = f"http://localhost:{GRAFANA_PORT}/d/{GRAFANA_DASHBOARD_UID}?orgId=1&kiosk"
+
+logger.info(f"Dashboard in {dashboard_url}")
+# If your dashboard is anonymous, this iframe should just work:
+st.components.v1.iframe(dashboard_url, width=1400, height=900)
