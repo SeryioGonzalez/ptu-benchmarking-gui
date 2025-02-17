@@ -90,13 +90,13 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.GITHUB_REPOSITORY_LOWER_CASE }}/${{ env.GRAFANA_IMAGE_NAME }}:${{ env.MINVERVERSIONOVERRIDE }}
           labels: ${{ steps.meta-grafana.outputs.labels }}
 
-      - name: Extract metadata (tags, labels) for gui Docker
+      - name: Extract metadata (tags, labels) for gui
         id: meta-gui
         uses: docker/metadata-action@v3
         with:
           images: ${{ env.REGISTRY }}/${{ env.BENCHMARKING_GUI_IMAGE_NAME }}
 
-      - name: Build and push Docker image for plugin
+      - name: Build and push Docker image for gui
         uses: docker/build-push-action@v3
         with:
           context: ./python/streamlit/
@@ -105,17 +105,17 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.GITHUB_REPOSITORY_LOWER_CASE }}/${{ env.BENCHMARKING_GUI_IMAGE_NAME }}:${{ env.MINVERVERSIONOVERRIDE }}
           labels: ${{ steps.meta-gui.outputs.labels }}
 
-      - name: Extract metadata (tags, labels) for api Docker
+      - name: Extract metadata (tags, labels) for api
         id: meta-api
         uses: docker/metadata-action@v3
         with:
           images: ${{ env.REGISTRY }}/${{ env.BENCHMARKING_API_IMAGE_NAME }}
 
-      - name: Build and push Docker image for fsi plugin
+      - name: Build and push Docker image for api
         uses: docker/build-push-action@v3
         with:
-          context: ./azure-openai-benchmark
-          file: ./azure-openai-benchmark/Dockerfile
+          context: ./python/azure-openai-benchmark
+          file: ./python/azure-openai-benchmark/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ env.REGISTRY }}/${{ env.GITHUB_REPOSITORY_LOWER_CASE }}/${{ env.BENCHMARKING_API_IMAGE_NAME }}:${{ env.MINVERVERSIONOVERRIDE }}
           labels: ${{ steps.meta-api.outputs.labels }}
