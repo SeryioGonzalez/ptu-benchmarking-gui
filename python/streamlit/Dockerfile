@@ -12,4 +12,3 @@ COPY . /app
 EXPOSE ${STREAMLIT_PORT}
 
 CMD ["sh", "-c", "streamlit run streamlit_app.py --server.port=$STREAMLIT_PORT --server.headless=true"]
-
