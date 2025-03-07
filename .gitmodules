@@ -1,0 +1,3 @@
+[submodule "python/azure-openai-benchmark"]
+	path = python/azure-openai-benchmark
+	url = https://github.com/Azure/azure-openai-benchmark.git
