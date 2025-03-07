@@ -9,10 +9,13 @@ BENCHMARK_TOOL_API_PORT = os.getenv("BENCHMARK_TOOL_API_PORT")
 
 
 USE_DEFAULTS = True
-DEFAULT_ENDPOINT = "https://sergioazopenai.openai.azure.com/"
-DEFAULT_KEY = "f23ed9e95aa84102940416d101141762"
-DEFAULT_PAYGO_DEPLOYMENT = "gpt-4o-2024-11-20"
-DEFAULT_PTU_DEPLOYMENT = "gpt-4o-mini-2024-07-18"
+DEFAULT_ENDPOINT = "https://gbb-ea-aoai-swedencentral-ptu-hourly.openai.azure.com/"
+DEFAULT_KEY = "FX1YRbzcHP6AyR3tMCNVVHYXl8ZS6XBor9AZkGTzTLwaH34bhMY5JQQJ99BBACfhMk5XJ3w3AAABACOGGrDF"
+DEFAULT_PAYGO_DEPLOYMENT = "gpt-4o-2024-08-06-dz-paygo"
+DEFAULT_PTU_DEPLOYMENT = "gpt-4o-2024-08-06-dz-ptu"
+
+DEFAULT_PROMPT_TOKENS = 8000
+DEFAULT_COMPLETION_TOKENS = 500
 
 logging.basicConfig(
     level=logging.INFO,  # Change to DEBUG for more detailed logs
@@ -171,8 +174,8 @@ with st.sidebar:
         st.session_state.experiment_data['duration'] = st.number_input("Experiment Duration (seconds)", min_value=30, value=30)
         st.session_state.experiment_data['rpm']      = st.number_input("Requests per minute (0 is no limit)", min_value=0, max_value=100000, value=0)
         
-        st.session_state.experiment_data['context_tokens'] = st.number_input("Prompt tokens per request", min_value=30, value=300)
-        st.session_state.experiment_data['max_tokens'] = st.number_input("Completion tokens per request", min_value=30, value=100)
+        st.session_state.experiment_data['context_tokens'] = st.number_input("Prompt tokens per request", min_value=30, value=DEFAULT_PROMPT_TOKENS)
+        st.session_state.experiment_data['max_tokens'] = st.number_input("Completion tokens per request", min_value=30, value=DEFAULT_COMPLETION_TOKENS)
 
     if st.button("Run Benchmark"): 
         if st.session_state.ptu_status and st.session_state.paygo_status:
