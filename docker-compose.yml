@@ -26,8 +26,8 @@ services:
     env_file:
       - .env
     environment:
-      - GF_SECURITY_ADMIN_USER=ptubenchmarker
-      - GF_SECURITY_ADMIN_PASSWORD=ptubenchmarker
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER_PASSWORD}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_USER_PASSWORD}
       - GRAFANA_PORT=${GRAFANA_PORT}
       - PROMETHEUS_PORT=${PROMETHEUS_PORT}
     depends_on:

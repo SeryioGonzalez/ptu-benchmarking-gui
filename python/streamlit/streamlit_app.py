@@ -2,6 +2,9 @@ import logging
 import os
 import requests
 import streamlit as st
+import time
+
+from datetime import datetime
 
 GRAFANA_DASHBOARD_UID = "ce977t8gv5czkb/ptu-benchmarking-v2"
 GRAFANA_PORT = os.getenv("GRAFANA_PORT")
@@ -195,8 +198,15 @@ with st.sidebar:
 
 st.write("## Live Dashboard")
 
+clock_placeholder = st.empty()
+
 dashboard_url = f"http://localhost:{GRAFANA_PORT}/d/{GRAFANA_DASHBOARD_UID}?orgId=1&kiosk"
 
 logger.info(f"Dashboard in {dashboard_url}")
 # If your dashboard is anonymous, this iframe should just work:
 st.components.v1.iframe(dashboard_url, width=1400, height=900)
+
+while True:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    clock_placeholder.markdown(f"### 🕒 Current Time: {now}")
+    time.sleep(1)
