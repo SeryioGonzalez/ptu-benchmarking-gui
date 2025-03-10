@@ -7,16 +7,20 @@ GRAFANA_DASHBOARD_UID = "ce977t8gv5czkb/ptu-benchmarking-v2"
 GRAFANA_PORT = os.getenv("GRAFANA_PORT")
 BENCHMARK_TOOL_API_PORT = os.getenv("BENCHMARK_TOOL_API_PORT")
 
-
 USE_DEFAULTS = True
-DEFAULT_ENDPOINT = "https://gbb-ea-aoai-northcentralus-ptu-hourly.openai.azure.com/"
-DEFAULT_KEY = "1zqSY8LAbfdU9OBZjL8dJj9uBu9edyA8nCk1QlicfcAmVZm3l0KGJQQJ99BBACHrzpqXJ3w3AAABACOGMvmM"
-DEFAULT_PTU_DEPLOYMENT = "gpt-4o-2024-11-20-global-paygo"
-DEFAULT_PAYGO_DEPLOYMENT = "gpt-4o-2024-08-06-global-paygo"
 
+DEFAULT_ENDPOINT_LABEL_1 = os.getenv("DEFAULT_ENDPOINT_LABEL_1") or None
+DEFAULT_ENDPOINT_URL_1 = os.getenv("DEFAULT_ENDPOINT_URL_1") or None
+DEFAULT_ENDPOINT_KEY_1 = os.getenv("DEFAULT_ENDPOINT_KEY_1") or None
+DEFAULT_ENDPOINT_DEPLOYMENT_1 = os.getenv("DEFAULT_ENDPOINT_DEPLOYMENT_1") or None
 
-DEFAULT_PROMPT_TOKENS = 8000
-DEFAULT_COMPLETION_TOKENS = 500
+DEFAULT_ENDPOINT_LABEL_2 = os.getenv("DEFAULT_ENDPOINT_LABEL_2") or None
+DEFAULT_ENDPOINT_URL_2 = os.getenv("DEFAULT_ENDPOINT_URL_2") or None
+DEFAULT_ENDPOINT_KEY_2 = os.getenv("DEFAULT_ENDPOINT_KEY_2") or None
+DEFAULT_ENDPOINT_DEPLOYMENT_2 = os.getenv("DEFAULT_ENDPOINT_DEPLOYMENT_2") or None
+
+DEFAULT_PROMPT_TOKENS = int(os.getenv("DEFAULT_PROMPT_TOKENS", 0)) or None
+DEFAULT_COMPLETION_TOKENS = int(os.getenv("DEFAULT_COMPLETION_TOKENS", 0)) or None
 
 logging.basicConfig(
     level=logging.INFO,  # Change to DEBUG for more detailed logs
@@ -26,8 +30,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def start_benchmarks():
-    logger.debug(f"Starting benchmarks - PTU {st.session_state.ptu_status} - PAYGO {st.session_state.paygo_status}")
-    if not (st.session_state.ptu_status and st.session_state.paygo_status):
+    logger.debug(f"Starting benchmarks - ENDPOINT_1 {st.session_state.endpoint_1_status} - ENDPOINT_2 {st.session_state.endpoint_2_status}")
+    if not (st.session_state.endpoint_1_status and st.session_state.endpoint_2_status):
         st.error("Check the configuration of the endpoints before starting the benchmarks.")
         return
 
@@ -38,29 +42,31 @@ def start_benchmarks():
         "rate": st.session_state.experiment_data['rpm']
     }
 
-    payload_ptu = {
+    payload_endpoint_1 = {
         **common_attributes,
-        "api_base_endpoint": st.session_state.endpoint_ptu,
-        "deployment": st.session_state.deployment_ptu,
-        "api_key": st.session_state.api_key_ptu,
+        "api_base_endpoint": st.session_state.endpoint_endpoint_1,
+        "deployment": st.session_state.deployment_endpoint_1,
+        "api_key": st.session_state.api_key_endpoint_1,
+        "custom_label": st.session_state.custom_label_endpoint_1
     }
 
-    payload_paygo = {
+    payload_endpoint_2 = {
         **common_attributes,
-        "api_base_endpoint": st.session_state.endpoint_paygo,
-        "deployment": st.session_state.deployment_paygo,
-        "api_key": st.session_state.api_key_paygo,
+        "api_base_endpoint": st.session_state.endpoint_endpoint_2,
+        "deployment": st.session_state.deployment_endpoint_2,
+        "api_key": st.session_state.api_key_endpoint_2,
+        "custom_label": st.session_state.custom_label_endpoint_2
     }
     
     try:
-        response_ptu =   requests.post(f"http://benchmark_ptu:{BENCHMARK_TOOL_API_PORT}/load", json=payload_ptu, timeout=60)
-        response_paygo = requests.post(f"http://benchmark_paygo:{BENCHMARK_TOOL_API_PORT}/load", json=payload_paygo, timeout=60)
+        response_endpoint_1 = requests.post(f"http://benchmark_endpoint_1:{BENCHMARK_TOOL_API_PORT}/load", json=payload_endpoint_1, timeout=60)
+        response_endpoint_2 = requests.post(f"http://benchmark_endpoint_2:{BENCHMARK_TOOL_API_PORT}/load", json=payload_endpoint_2, timeout=60)
         
-        if response_ptu.ok and response_paygo.ok:
+        if response_endpoint_1.ok and response_endpoint_2.ok:
             st.success("Benchmarks started successfully!")
         else:
-            error_messages = f"Benchmark 1 Error: {response_ptu.text if not response_ptu.ok else 'OK'}\n" \
-                             f"Benchmark 2 Error: {response_paygo.text if not response_paygo.ok else 'OK'}"
+            error_messages = f"Benchmark 1 Error: {response_endpoint_1.text if not response_endpoint_1.ok else 'OK'}\n" \
+                             f"Benchmark 2 Error: {response_endpoint_2.text if not response_endpoint_2.ok else 'OK'}"
             st.error(f"Error in launching benchmarks:\n{error_messages}")
             return {"error": error_messages}
 
@@ -129,16 +135,16 @@ def check_az_openai_endpoint_status(api_key, endpoint, deployment):
         print(f"Validation failed: Failed to reach the endpoint. Error: {e}")
         return False
 
-if "api_key_ptu" not in st.session_state:
-    st.session_state.api_key_ptu = ""
-    st.session_state.endpoint_ptu = ""
-    st.session_state.deployment_ptu = ""
-    st.session_state.ptu_status = False
+if "api_key_endpoint_1" not in st.session_state:
+    st.session_state.api_key_endpoint_1 = ""
+    st.session_state.endpoint_endpoint_1 = ""
+    st.session_state.deployment_endpoint_1 = ""
+    st.session_state.endpoint_1_status = False
 
-    st.session_state.api_key_paygo = ""
-    st.session_state.endpoint_paygo = ""
-    st.session_state.deployment_paygo = ""
-    st.session_state.paygo_status = False
+    st.session_state.api_key_endpoint_2 = ""
+    st.session_state.endpoint_endpoint_2 = ""
+    st.session_state.deployment_endpoint_2 = ""
+    st.session_state.endpoint_2_status = False
 
     st.session_state.experiment_data = {}
     st.session_state.experiment_data["context_generation_method"] = "generate"
@@ -146,29 +152,31 @@ if "api_key_ptu" not in st.session_state:
 
 st.set_page_config(layout="wide")
 
-st.title("PTU Benchmarking")
+st.title("Az OpenAI Benchmarking")
 
 # 1) Collect configuration inputs
 with st.sidebar:
     st.header("Azure OpenAI endpoint settings")
 
-    with st.expander("PTU Endpoint"):
-        st.session_state.api_key_ptu = st.text_input("AzOpenAI API Key - PTU", type="password", value=DEFAULT_KEY if USE_DEFAULTS else None)
-        st.session_state.endpoint_ptu = st.text_input("AzOpenAI Endpoint - PTU", value=DEFAULT_ENDPOINT if USE_DEFAULTS else None)
-        st.session_state.deployment_ptu = st.text_input("AzOpenAI Model Deployment - PTU", value=DEFAULT_PTU_DEPLOYMENT if USE_DEFAULTS else None)
+    with st.expander("Endpoint 1"):
+        st.session_state.custom_label_endpoint_1 = st.text_input("Endpoint label 1", value=DEFAULT_ENDPOINT_LABEL_1)
+        st.session_state.api_key_endpoint_1 = st.text_input("AzOpenAI API Key 1", type="password", value=DEFAULT_ENDPOINT_KEY_1 if USE_DEFAULTS else None)
+        st.session_state.endpoint_endpoint_1 = st.text_input("AzOpenAI Endpoint 1", value=DEFAULT_ENDPOINT_URL_1 if USE_DEFAULTS else None)
+        st.session_state.deployment_endpoint_1 = st.text_input("AzOpenAI Model Deployment 1", value=DEFAULT_ENDPOINT_DEPLOYMENT_1 if USE_DEFAULTS else None)
     
-    with st.expander('PAYGO Endpoint'):
-        st.session_state.api_key_paygo = st.text_input("AzOpenAI API Key - PAYGO", type="password", value=DEFAULT_KEY if USE_DEFAULTS else None)
-        st.session_state.endpoint_paygo = st.text_input("AzOpenAI Endpoint - PAYGO", value=DEFAULT_ENDPOINT if USE_DEFAULTS else None)
-        st.session_state.deployment_paygo = st.text_input("AzOpenAI Model Deployment - PAYGO", value=DEFAULT_PAYGO_DEPLOYMENT if USE_DEFAULTS else None)
+    with st.expander('Endpoint 2'):
+        st.session_state.custom_label_endpoint_2 = st.text_input("Endpoint label 2", value=DEFAULT_ENDPOINT_LABEL_2)
+        st.session_state.api_key_endpoint_2 = st.text_input("AzOpenAI API Key 2", type="password", value=DEFAULT_ENDPOINT_KEY_2 if USE_DEFAULTS else None)
+        st.session_state.endpoint_endpoint_2 = st.text_input("AzOpenAI Endpoint 2", value=DEFAULT_ENDPOINT_URL_2 if USE_DEFAULTS else None)
+        st.session_state.deployment_endpoint_2 = st.text_input("AzOpenAI Model Deployment 2", value=DEFAULT_ENDPOINT_DEPLOYMENT_2 if USE_DEFAULTS else None)
 
     col1, col2 = st.columns(2)
 
-    st.session_state.ptu_status   = check_az_openai_endpoint_status(st.session_state.api_key_ptu,   st.session_state.endpoint_ptu,   st.session_state.deployment_ptu)
-    st.session_state.paygo_status = check_az_openai_endpoint_status(st.session_state.api_key_paygo, st.session_state.endpoint_paygo, st.session_state.deployment_paygo)
+    st.session_state.endpoint_1_status   = check_az_openai_endpoint_status(st.session_state.api_key_endpoint_1,   st.session_state.endpoint_endpoint_1,   st.session_state.deployment_endpoint_1)
+    st.session_state.endpoint_2_status = check_az_openai_endpoint_status(st.session_state.api_key_endpoint_2, st.session_state.endpoint_endpoint_2, st.session_state.deployment_endpoint_2)
 
-    display_status("PTU Endpoint",   st.session_state.ptu_status, col1)
-    display_status("PAYGO Endpoint", st.session_state.paygo_status, col2)
+    display_status("Endpoint 1",   st.session_state.endpoint_1_status, col1)
+    display_status("Endpoint 2", st.session_state.endpoint_2_status, col2)
 
     st.header("Benchmark configuration")
     with st.expander('Config'):
@@ -179,7 +187,7 @@ with st.sidebar:
         st.session_state.experiment_data['max_tokens'] = st.number_input("Completion tokens per request", min_value=30, value=DEFAULT_COMPLETION_TOKENS)
 
     if st.button("Run Benchmark"): 
-        if st.session_state.ptu_status and st.session_state.paygo_status:
+        if st.session_state.endpoint_1_status and st.session_state.endpoint_2_status:
             start_benchmarks()
         else:
             st.warning("Please check the endpoint configuration before starting the benchmarks.")

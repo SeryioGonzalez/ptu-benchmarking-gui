@@ -26,8 +26,8 @@ services:
     env_file:
       - .env
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=ptubenchmarker
+      - GF_SECURITY_ADMIN_PASSWORD=ptubenchmarker
       - GRAFANA_PORT=${GRAFANA_PORT}
       - PROMETHEUS_PORT=${PROMETHEUS_PORT}
     depends_on:
@@ -42,7 +42,6 @@ services:
     volumes:
       - ./config/grafana/grafana_datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
       - ./config/grafana/grafana_dashboard_config.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
-      - ./config/grafana/grafana_dashboard.json:/etc/grafana/provisioning/dashboards/grafana_dashboard.json
       - ./config/grafana/grafana_dashboard.v2.json:/etc/grafana/provisioning/dashboards/grafana_dashboard.v2.json
       - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini
     networks:
@@ -60,6 +59,16 @@ services:
     environment:
       - STREAMLIT_LOG_LEVEL=info
       - STREAMLIT_PORT=${STREAMLIT_PORT}
+      - DEFAULT_ENDPOINT_LABEL_1=${DEFAULT_ENDPOINT_LABEL_1}
+      - DEFAULT_ENDPOINT_URL_1=${DEFAULT_ENDPOINT_URL_1}
+      - DEFAULT_ENDPOINT_KEY_1=${DEFAULT_ENDPOINT_KEY_1}
+      - DEFAULT_ENDPOINT_DEPLOYMENT_1=${DEFAULT_ENDPOINT_DEPLOYMENT_1}
+      - DEFAULT_ENDPOINT_LABEL_2=${DEFAULT_ENDPOINT_LABEL_2}
+      - DEFAULT_ENDPOINT_URL_2=${DEFAULT_ENDPOINT_URL_2}
+      - DEFAULT_ENDPOINT_KEY_2=${DEFAULT_ENDPOINT_KEY_2}
+      - DEFAULT_ENDPOINT_DEPLOYMENT_2=${DEFAULT_ENDPOINT_DEPLOYMENT_2}
+      - DEFAULT_PROMPT_TOKENS=${DEFAULT_PROMPT_TOKENS}
+      - DEFAULT_COMPLETION_TOKENS=${DEFAULT_COMPLETION_TOKENS}
     depends_on:
       grafana:
         condition: service_healthy
@@ -73,13 +82,13 @@ services:
     networks:
       - ptu_network
 
-  benchmark_paygo:
+  benchmark_endpoint_1:
     build:
       context: ./python/azure-openai-benchmark
       args:
         API_PORT: ${BENCHMARK_TOOL_API_PORT}
         PROMETHEUS_PORT: ${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
-    container_name: benchmark_paygo
+    container_name: benchmark_endpoint_1
     <<: *common_labels
     env_file:
       - .env
@@ -94,16 +103,18 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    ports:
+      - 10001:${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
     networks:
       - ptu_network
 
-  benchmark_ptu:
+  benchmark_endpoint_2:
     build:
       context: ./python/azure-openai-benchmark
       args:
         API_PORT: ${BENCHMARK_TOOL_API_PORT}
         PROMETHEUS_PORT: ${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
-    container_name: benchmark_ptu
+    container_name: benchmark_endpoint_2
     <<: *common_labels
     env_file:
       - .env
@@ -118,6 +129,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    ports:
+      - 10002:${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
     networks:
       - ptu_network
 
