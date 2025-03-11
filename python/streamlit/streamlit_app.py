@@ -4,7 +4,7 @@ import requests
 import streamlit as st
 import time
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 GRAFANA_DASHBOARD_UID = "ce977t8gv5czkb/ptu-benchmarking-v2"
 GRAFANA_PORT = os.getenv("GRAFANA_PORT")
@@ -66,7 +66,13 @@ def start_benchmarks():
         response_endpoint_2 = requests.post(f"http://benchmark_endpoint_2:{BENCHMARK_TOOL_API_PORT}/load", json=payload_endpoint_2, timeout=60)
         
         if response_endpoint_1.ok and response_endpoint_2.ok:
-            st.success("Benchmarks started successfully!")
+            start_time = datetime.now()
+            formatted_start = start_time.strftime("%H:%M:%S")
+            end_time = start_time + timedelta(seconds=st.session_state.experiment_data['duration'])
+            formatted_end = end_time.strftime("%H:%M:%S")
+
+            st.success(f"Benchmarks started successfully at {formatted_start}")
+            st.info(f"Benchmarks will end at {formatted_end}")
         else:
             error_messages = f"Benchmark 1 Error: {response_endpoint_1.text if not response_endpoint_1.ok else 'OK'}\n" \
                              f"Benchmark 2 Error: {response_endpoint_2.text if not response_endpoint_2.ok else 'OK'}"
