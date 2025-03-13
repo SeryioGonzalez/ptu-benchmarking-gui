@@ -64,26 +64,29 @@ def start_benchmarks():
     try:
         response_endpoint_1 = requests.post(f"http://benchmark_endpoint_1:{BENCHMARK_TOOL_API_PORT}/load", json=payload_endpoint_1, timeout=60)
         response_endpoint_2 = requests.post(f"http://benchmark_endpoint_2:{BENCHMARK_TOOL_API_PORT}/load", json=payload_endpoint_2, timeout=60)
-        
+
+        success_placeholder = st.empty()
+        info_placeholder = st.empty()
+
         if response_endpoint_1.ok and response_endpoint_2.ok:
             start_time = datetime.now()
             formatted_start = start_time.strftime("%H:%M:%S")
             end_time = start_time + timedelta(seconds=st.session_state.experiment_data['duration'])
             formatted_end = end_time.strftime("%H:%M:%S")
 
-            st.success(f"Benchmarks started successfully at {formatted_start}")
-            st.info(f"Benchmarks will end at {formatted_end}")
+            success_placeholder.success(f"Benchmarks started successfully at {formatted_start}")
+            info_placeholder.info(f"Benchmarks will end at {formatted_end}")
         else:
             error_messages = f"Benchmark 1 Error: {response_endpoint_1.text if not response_endpoint_1.ok else 'OK'}\n" \
                              f"Benchmark 2 Error: {response_endpoint_2.text if not response_endpoint_2.ok else 'OK'}"
-            st.error(f"Error in launching benchmarks:\n{error_messages}")
+            info_placeholder.error(f"Error in launching benchmarks:\n{error_messages}")
             return {"error": error_messages}
 
     except requests.exceptions.RequestException as e:
-        st.error(f"Error launching test: {e}")
+        info_placeholder.error(f"Error launching test: {e}")
         return {"error": str(e)}
 
-def display_status(label, status, col):
+def display_endpoint_status(label, status, col):
     """Display a configuration item with a green or red indicator, centered in the column."""
     color = "green" if status else "red"
     col.markdown(
@@ -156,6 +159,7 @@ if "api_key_endpoint_1" not in st.session_state:
     st.session_state.endpoint_2_status = False
 
     st.session_state.experiment_data = {}
+    st.session_state.experiment_data['active_experiment'] = False
     st.session_state.experiment_data["context_generation_method"] = "generate"
     st.session_state.experiment_data["shape_profile"] = "custom"
 
@@ -184,8 +188,8 @@ with st.sidebar:
     st.session_state.endpoint_1_status   = check_az_openai_endpoint_status(st.session_state.api_key_endpoint_1,   st.session_state.endpoint_endpoint_1,   st.session_state.deployment_endpoint_1)
     st.session_state.endpoint_2_status = check_az_openai_endpoint_status(st.session_state.api_key_endpoint_2, st.session_state.endpoint_endpoint_2, st.session_state.deployment_endpoint_2)
 
-    display_status("Endpoint 1",   st.session_state.endpoint_1_status, col1)
-    display_status("Endpoint 2", st.session_state.endpoint_2_status, col2)
+    display_endpoint_status("Endpoint 1",   st.session_state.endpoint_1_status, col1)
+    display_endpoint_status("Endpoint 2", st.session_state.endpoint_2_status, col2)
 
     st.header("Benchmark configuration")
     with st.expander('Config'):
@@ -195,8 +199,12 @@ with st.sidebar:
         st.session_state.experiment_data['context_tokens'] = st.number_input("Prompt tokens per request", min_value=30, value=DEFAULT_PROMPT_TOKENS)
         st.session_state.experiment_data['max_tokens'] = st.number_input("Completion tokens per request", min_value=30, value=DEFAULT_COMPLETION_TOKENS)
 
-    if st.button("Run Benchmark"): 
+    if st.button("Run Benchmark"):
         if st.session_state.endpoint_1_status and st.session_state.endpoint_2_status:
+            st.session_state.experiment_data['active_experiment'] = True
+            st.session_state.experiment_data['start_time'] = datetime.now()
+            st.session_state.experiment_data['end_time'] = st.session_state.experiment_data['start_time'] + timedelta(seconds=st.session_state.experiment_data['duration'])
+
             start_benchmarks()
         else:
             st.warning("Please check the endpoint configuration before starting the benchmarks.")
@@ -213,6 +221,28 @@ logger.info(f"Dashboard in {dashboard_url}")
 st.components.v1.iframe(dashboard_url, width=1400, height=900)
 
 while True:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    clock_placeholder.markdown(f"### 🕒 Current Time: {now}")
+    # Update the clock every second
+    # Get the current time and format it
+    time_now = datetime.now()
+    time_now_formatted = time_now.strftime("%H:%M:%S")
+
+    display_message = f"### Current time: {time_now_formatted}. "
+
+    # 
+
+    if st.session_state.experiment_data['active_experiment']:
+        # Check if the experiment is still active
+        if datetime.now() >= st.session_state.experiment_data['end_time']:
+            st.session_state.experiment_data['active_experiment'] = False
+            st.session_state.experiment_data['start_time'] = None
+            st.session_state.experiment_data['end_time'] = None
+            display_message += "Benchmark completed successfully!"
+            
+        else:
+            time_remaining = st.session_state.experiment_data['end_time'] - datetime.now()
+            time_remaining_formatted = str(time_remaining).split(".")[0]
+
+            display_message += f"Time remaining for current benchmark: {time_remaining_formatted}"
+
+    clock_placeholder.markdown(display_message)
     time.sleep(1)
