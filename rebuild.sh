@@ -9,6 +9,9 @@ fi
 echo "🧹 Stopping and removing existing containers..."
 docker compose down --remove-orphans
 
+echo "🔌 Removing custom Docker network..."
+docker network rm ptu_network 2>/dev/null || true
+
 echo "🔨 Building images..."
 docker compose build
 
