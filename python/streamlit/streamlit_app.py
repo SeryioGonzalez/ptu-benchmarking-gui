@@ -61,12 +61,12 @@ def start_benchmarks():
         "custom_label": st.session_state.custom_label_endpoint_2
     }
     
+    success_placeholder = st.empty()
+    info_placeholder = st.empty()
+
     try:
         response_endpoint_1 = requests.post(f"http://benchmark_endpoint_1:{BENCHMARK_TOOL_API_PORT}/load", json=payload_endpoint_1, timeout=60)
         response_endpoint_2 = requests.post(f"http://benchmark_endpoint_2:{BENCHMARK_TOOL_API_PORT}/load", json=payload_endpoint_2, timeout=60)
-
-        success_placeholder = st.empty()
-        info_placeholder = st.empty()
 
         if response_endpoint_1.ok and response_endpoint_2.ok:
             start_time = datetime.now()
