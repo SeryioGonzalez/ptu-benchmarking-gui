@@ -193,8 +193,8 @@ with st.sidebar:
 
     st.header("Benchmark configuration")
     with st.expander('Config'):
-        st.session_state.experiment_data['duration'] = st.number_input("Experiment Duration (seconds)", min_value=30, value=30)
-        st.session_state.experiment_data['rpm']      = st.number_input("Requests per minute (0 is no limit)", min_value=0, max_value=100000, value=0)
+        st.session_state.experiment_data['duration'] = st.number_input("Experiment Duration (seconds)", min_value=30, value=100)
+        st.session_state.experiment_data['rpm']      = st.number_input("Requests per minute (0 is no limit)", min_value=0, max_value=100000, value=15)
         
         st.session_state.experiment_data['context_tokens'] = st.number_input("Prompt tokens per request", min_value=30, value=DEFAULT_PROMPT_TOKENS)
         st.session_state.experiment_data['max_tokens'] = st.number_input("Completion tokens per request", min_value=30, value=DEFAULT_COMPLETION_TOKENS)
