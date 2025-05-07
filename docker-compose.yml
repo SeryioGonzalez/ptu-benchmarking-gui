@@ -5,7 +5,6 @@ x-labels: &common_labels
 services:
   prometheus:
     image: prom/prometheus
-    container_name: prometheus
     <<: *common_labels
     env_file:
       - .env
@@ -21,7 +20,6 @@ services:
 
   grafana:
     image: grafana/grafana
-    container_name: grafana
     <<: *common_labels
     env_file:
       - .env
@@ -52,7 +50,6 @@ services:
       context: ./python/streamlit/
       args:
         STREAMLIT_PORT: ${STREAMLIT_PORT}
-    container_name: streamlit_app
     <<: *common_labels
     env_file:
       - .env
@@ -88,7 +85,6 @@ services:
       args:
         API_PORT: ${BENCHMARK_TOOL_API_PORT}
         PROMETHEUS_PORT: ${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
-    container_name: benchmark_endpoint_1
     <<: *common_labels
     env_file:
       - .env
@@ -114,7 +110,6 @@ services:
       args:
         API_PORT: ${BENCHMARK_TOOL_API_PORT}
         PROMETHEUS_PORT: ${BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT}
-    container_name: benchmark_endpoint_2
     <<: *common_labels
     env_file:
       - .env
