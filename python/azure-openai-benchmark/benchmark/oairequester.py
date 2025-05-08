@@ -155,24 +155,44 @@ class OAIRequester:
             stats.response_time = time.time()
             try:
                 async for line in response.content:
-                    if not line.startswith(b'data:'):
+                    # only care about data: frames
+                    if not line.startswith(b"data:"):
                         continue
+
+                    text = line.decode("utf-8").strip()
+                    # end‐of‐stream sentinel
+                    if text == "data: [DONE]":
+                        break
+
+                    # remove only the first "data: " prefix
+                    payload = text[len("data: "):]
+                    try:
+                        msg = json.loads(payload)
+                    except json.JSONDecodeError:
+                        # skip malformed frames
+                        continue
+
+                    # skip anything without a choices array
+                    choices = msg.get("choices")
+                    if not choices or not isinstance(choices, list):
+                        continue
+
+                    delta = choices[0].get("delta", {})
+                    if not delta:
+                        continue
+
+                    # first token timestamp
                     if stats.first_token_time is None:
                         stats.first_token_time = time.time()
                     if stats.generated_tokens is None:
                         stats.generated_tokens = 0
-                    # Save content from generated tokens
-                    content = line.decode('utf-8')
-                    if content == "data: [DONE]\n":
-                        # Request is finished - no more tokens to process
-                        break
-                    content = json.loads(content.replace("data: ", ""))["choices"][0]["delta"]
-                    if content:
-                        if "role" in content:
-                            stats.output_content.append({"role": content["role"], "content": ""})
-                        else:
-                            stats.output_content[-1]["content"] += content["content"]
-                            stats.generated_tokens += 1
+
+                    # merge into stats.output_content just like before
+                    if "role" in delta:
+                        stats.output_content.append({"role": delta["role"], "content": ""})
+                    else:
+                        stats.output_content[-1]["content"] += delta.get("content", "")
+                        stats.generated_tokens += 1
             finally:
                 stats.response_end_time = time.time()
 
