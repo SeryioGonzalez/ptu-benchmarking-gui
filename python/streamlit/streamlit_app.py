@@ -37,10 +37,10 @@ def start_benchmarks():
     if not (st.session_state.endpoint_1_status and st.session_state.endpoint_2_status):
         st.error("Check the configuration of the endpoints before starting the benchmarks.")
         return
-
+    
     common_attributes = {
-        "replay_path": "prompts.json",
-        "context_generation_method": "reply",
+        "context_tokens": st.session_state.experiment_data['context_tokens'],
+        "max_tokens": st.session_state.experiment_data['max_tokens'],
         "duration": st.session_state.experiment_data['duration'],
         "rate": st.session_state.experiment_data['rpm']
     }
@@ -65,8 +65,8 @@ def start_benchmarks():
     info_placeholder = st.empty()
 
     try:
-        response_endpoint_1 = requests.post(f"http://benchmark_endpoint_1:{BENCHMARK_TOOL_API_PORT}/load", json=payload_endpoint_1, timeout=60)
-        response_endpoint_2 = requests.post(f"http://benchmark_endpoint_2:{BENCHMARK_TOOL_API_PORT}/load", json=payload_endpoint_2, timeout=60)
+        response_endpoint_1 = requests.post(f"http://benchmark_endpoint_1:{BENCHMARK_TOOL_API_PORT}/benchmark", json=payload_endpoint_1, timeout=60)
+        response_endpoint_2 = requests.post(f"http://benchmark_endpoint_2:{BENCHMARK_TOOL_API_PORT}/benchmark", json=payload_endpoint_2, timeout=60)
 
         if response_endpoint_1.ok and response_endpoint_2.ok:
             start_time = datetime.now()

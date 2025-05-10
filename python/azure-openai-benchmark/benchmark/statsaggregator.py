@@ -66,7 +66,8 @@ class _StatsAggregator(threading.Thread):
          dump_duration:float=5, 
          window_duration:float=60, 
          expected_gen_tokens: Optional[int] = None, 
-         json_output:bool=False, 
+         json_output:bool=False,
+         custom_label:str=None,
          log_request_content:bool=False, 
          network_latency_adjustment:float=0, 
          *args,
@@ -86,6 +87,7 @@ class _StatsAggregator(threading.Thread):
       self.window_duration = window_duration
       self.expected_gen_tokens = expected_gen_tokens
       self.json_output = json_output
+      self.custom_label = custom_label
       self.log_request_content = log_request_content
       self.network_latency_adjustment = network_latency_adjustment
 

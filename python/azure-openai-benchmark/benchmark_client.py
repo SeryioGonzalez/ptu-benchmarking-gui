@@ -42,7 +42,8 @@ if __name__ == "__main__":
         "context_tokens": 1000,
         "max_tokens": 200,
         "rate": 0,
-        "duration": 30
+        "duration": 30,
+        "custom_label": "test"
     }
 
     # 1) Start a new benchmark (cancels any previous)

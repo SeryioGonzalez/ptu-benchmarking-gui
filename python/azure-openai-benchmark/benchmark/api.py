@@ -28,11 +28,12 @@ class BenchmarkStatus(str, Enum):
 class BenchmarkRequest(BaseModel):
     api_key: str
     api_base_endpoint: str
+    custom_label: str 
     deployment: str
-    api_version: str
     context_tokens: int
     max_tokens: int
     # Optional parameters with defaults
+    api_version: str = "2025-01-01-preview"
     aggregation_window: Optional[int] = 60
     clients: Optional[int] = 1
     output_format: str = "jsonl"
@@ -86,9 +87,9 @@ async def start_benchmark(req: BenchmarkRequest):
             current_job.completed_at = datetime.utcnow()
             current_job.error = "Canceled by new benchmark request"
 
-        logger.info("Starting new benchmark job")
+        logger.info(f"Starting new benchmark job with label {req.custom_label}")
         job = BenchmarkJob(
-            id=str(uuid.uuid4()),
+            id=f"{req.custom_label}_{str(uuid.uuid4())}",
             request=req,
             status=BenchmarkStatus.queued,
             created_at=datetime.utcnow(),

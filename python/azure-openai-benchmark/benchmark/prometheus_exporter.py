@@ -16,15 +16,15 @@ def start_exporter(stats_aggregator) -> None:
     Call once, soon after you create the StatsAggregator instance.
     """
 
-    class _StatsCollector:                    # ❶ pulls fresh dict each scrape
+    class _StatsCollector:
         def collect(self):
             for name, value in stats_aggregator.get_latest_metrics().items():
                 if isinstance(value, (int, float)):       # skip timestamp str
-                    g = GaugeMetricFamily(name, f"{name} (auto)", labels=[])
-                    g.add_metric([], value)
+                    g = GaugeMetricFamily(name, f"{name} (auto)", labels=["label"])
+                    g.add_metric([stats_aggregator.custom_label], value)
                     yield g
 
-    logger.info(f"Registering Prometheus collector for {stats_aggregator.__class__.__name__}")    
+    logger.info(f"Registering Prometheus collector with label {stats_aggregator.custom_label}")    
     REGISTRY.register(_StatsCollector())
 
     logger.info(f"Starting Prometheus exporter on port {PROMETHEUS_PORT}")
