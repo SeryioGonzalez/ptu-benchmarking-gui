@@ -20,6 +20,7 @@ from benchmark.messagegeneration import (
 
 from .asynchttpexecuter import AsyncHTTPExecuter
 from .oairequester import OAIRequester
+from .prometheus_exporter import start_exporter
 from .ratelimiting import NoRateLimiter, RateLimiter
 from .statsaggregator import _StatsAggregator
 
@@ -236,7 +237,8 @@ def _run_load(
       network_latency_adjustment=network_latency_adjustment,
    )
 
-   
+    # Start the Prometheus exporter
+   start_exporter(aggregator)
 
    requester = OAIRequester(api_key, url, backoff=backoff)
 

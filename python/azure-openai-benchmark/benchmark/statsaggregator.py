@@ -89,6 +89,8 @@ class _StatsAggregator(threading.Thread):
       self.log_request_content = log_request_content
       self.network_latency_adjustment = network_latency_adjustment
 
+      self._latest_metrics = {}
+
       super(_StatsAggregator, self).__init__(*args, **kwargs)
 
 
@@ -206,43 +208,38 @@ class _StatsAggregator(threading.Thread):
             )
          # Handle the 1x extra processing_request due to next request being queued
          processing_requests_count = min(self.clients, self.processing_requests_count)
+         
+         self._latest_metrics = {
+            "run_seconds": run_seconds,
+            "timestamp": timestamp,  # kept as-is for logging, not exported as a metric
+            "rpm": rpm,
+            "processing": processing_requests_count,
+            "completed_requests": self.total_requests_count,
+            "failed_requests": self.total_failed_count,
+            "throttled_requests": self.throttled_count,
+            "tpm_context": context_per_minute,
+            "tpm_gen": gen_per_minute,
+            "tpm_total": tokens_per_minute,
+            "e2e_avg": e2e_latency_avg,
+            "e2e_95th": e2e_latency_95th,
+            "ttft_avg": ttft_avg,
+            "ttft_95th": ttft_95th,
+            "tbt_avg": tbt_avg,
+            "tbt_95th": tbt_95th,
+            "context_tpr_avg": context_tpr_avg,
+            "gen_tpr_avg": gen_tpr_avg,
+            "gen_tpr_10th": gen_tpr_10th,
+            "gen_tpr_90th": gen_tpr_90th,
+         }
+
          if self.json_output:
-            j = {
-               "run_seconds": run_seconds,
-               "timestamp": timestamp,
-               "rpm": rpm,
-               "processing": processing_requests_count,
-               "completed": self.total_requests_count,
-               "failures": self.total_failed_count,
-               "throttled": self.throttled_count,
-               "requests": self.total_requests_count,
-               "tpm": {
-                  "context": context_per_minute,
-                  "gen": gen_per_minute,
-                  "total": tokens_per_minute,
-               },
-               "e2e": {
-                  "avg": e2e_latency_avg,
-                  "95th": e2e_latency_95th,
-               },
-               "ttft": {
-                  "avg": ttft_avg,
-                  "95th": ttft_95th,
-               },
-               "tbt": {
-                  "avg": tbt_avg,
-                  "95th": tbt_95th,
-               },
-               "context_tpr_avg": context_tpr_avg,
-               "gen_tpr": {
-                  "10th": gen_tpr_10th,
-                  "avg": gen_tpr_avg,
-                  "90th": gen_tpr_90th,
-               }
-            }
-            logger.info(json.dumps(j))
+            logger.info(json.dumps(self._latest_metrics))
          else:
             logger.info(f"rpm: {rpm:<5} processing: {processing_requests_count:<4} completed: {self.total_requests_count:<5} failures: {self.total_failed_count:<4} throttled: {self.throttled_count:<4} requests: {self.total_requests_count:<5} tpm: {tokens_per_minute:<6} ttft_avg: {ttft_avg:<6} ttft_95th: {ttft_95th:<6} tbt_avg: {tbt_avg:<6} tbt_95th: {tbt_95th:<6} e2e_avg: {e2e_latency_avg:<6} e2e_95th: {e2e_latency_95th:<6} context_tpr_avg {context_tpr_avg:<4} gen_tpr_10th {gen_tpr_10th:<4} gen_tpr_avg {gen_tpr_avg:<4} gen_tpr_90th {gen_tpr_90th:<4} util_avg: {util_avg:<6} util_95th: {util_95th:<6}")
+
+   def get_latest_metrics(self) -> dict:
+      with self.lock:
+         return self._latest_metrics.copy()
 
    def _slide_window(self):
       with self.lock:

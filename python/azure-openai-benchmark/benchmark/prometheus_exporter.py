@@ -1,63 +1,33 @@
-"""
-Exports StatsAggregator's gauges via Prometheus.
+import logging
+import os
 
-Importing this module has NO side-effects; call `start_exporter()` once near
-program start-up (e.g. right after you create StatsAggregator).
-"""
+from prometheus_client import REGISTRY, start_http_server
+from prometheus_client.core import GaugeMetricFamily
+from typing import Union
 
-from __future__ import annotations
-from typing import TYPE_CHECKING
-from prometheus_client import Gauge, CollectorRegistry, start_http_server
+logger = logging.getLogger(__name__)
+Number = Union[int, float]
 
-if TYPE_CHECKING:                       # avoid circular import at runtime
-    from .stats_aggregator import StatsAggregator
+PROMETHEUS_PORT = int(os.getenv("PROMETHEUS_PORT", 9100))
 
-_PORT_DEFAULT = 9000
-_registry: CollectorRegistry | None = None
-_started: bool = False
-
-
-def _gauge(name: str, description: str, value_fn):
+def start_exporter(stats_aggregator) -> None:
     """
-    Helper that registers a Gauge whose value is taken from `value_fn`
-    every time Prometheus scrapes /metrics.
+    Expose `stats_aggregator.get_latest_metrics()` at /metrics.
+    Call once, soon after you create the StatsAggregator instance.
     """
-    return Gauge(
-        name,
-        description,
-        registry=_registry,
-        # ValueFuncGauge is created under the hood when 'callback' is given
-        # (see prometheus_client docs >= 0.20.0)
-        labelnames=(),
-        unit="",
-        callback=value_fn,
-    )
 
+    class _StatsCollector:                    # ❶ pulls fresh dict each scrape
+        def collect(self):
+            for name, value in stats_aggregator.get_latest_metrics().items():
+                if isinstance(value, (int, float)):       # skip timestamp str
+                    g = GaugeMetricFamily(name, f"{name} (auto)", labels=[])
+                    g.add_metric([], value)
+                    yield g
 
-def start_exporter(stats: "StatsAggregator", port: int | None = None) -> None:
-    """
-    Idempotent initialiser – safe to call multiple times; only the first call
-    does any work.
-    """
-    global _registry, _started
-    if _started:         # already running
-        return
+    logger.info(f"Registering Prometheus collector for {stats_aggregator.__class__.__name__}")    
+    REGISTRY.register(_StatsCollector())
 
-    _registry = CollectorRegistry(auto_describe=True)
+    logger.info(f"Starting Prometheus exporter on port {PROMETHEUS_PORT}")
+    start_http_server(PROMETHEUS_PORT)
+    logger.info(f"Prometheus exporter up on :{PROMETHEUS_PORT}/metrics")
 
-    # -----------------------------------------------------------------
-    # Create one Gauge per *public* attribute that StatsAggregator marks
-    # as exportable.  We use the convention: every attr in
-    # `stats.prometheus_gauges` is a (metric_name, help_text) tuple.
-    # -----------------------------------------------------------------
-    for attr_name, (metric_name, help_text) in stats.prometheus_gauges.items():
-
-        # Freeze `attr_name` in a new scope so every lambda has its own copy
-        def _make_value_fn(an=attr_name):
-            return lambda: getattr(stats, an)
-
-        _gauge(metric_name, help_text, _make_value_fn())
-
-    # finally expose /metrics
-    start_http_server(port or _PORT_DEFAULT, registry=_registry)
-    _started = True
