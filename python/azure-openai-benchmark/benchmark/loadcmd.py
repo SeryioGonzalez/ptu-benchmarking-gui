@@ -15,8 +15,7 @@ from ping3 import ping
 
 from benchmark.messagegeneration import (
     BaseMessagesGenerator,
-    RandomMessagesGenerator,
-    ReplayMessagesGenerator,
+    RandomMessagesGenerator
 )
 
 from .asynchttpexecuter import AsyncHTTPExecuter

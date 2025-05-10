@@ -14,7 +14,6 @@ import backoff
 # TODO: switch to using OpenAI client library once new headers are exposed.
 
 REQUEST_ID_HEADER = "apim-request-id"
-UTILIZATION_HEADER = "azure-openai-deployment-utilization"
 RETRY_AFTER_MS_HEADER = "retry-after-ms"
 MAX_RETRY_SECONDS = 60.0
 
@@ -33,7 +32,6 @@ class RequestStats:
         self.response_end_time: Optional[float] = None
         self.context_tokens: int = 0
         self.generated_tokens: Optional[int] = None
-        self.deployment_utilization: Optional[float] = None
         self.calls: int = 0
         self.last_exception: Optional[Exception] = None
         self.input_messages: Optional[dict[str, str]] = None
@@ -48,7 +46,6 @@ class RequestStats:
             "response_end_time": self.response_end_time,
             "context_tokens": self.context_tokens,
             "generated_tokens": self.generated_tokens,
-            "deployment_utilization": self.deployment_utilization,
             "calls": self.calls,
         }
         if include_request_content:
@@ -123,8 +120,6 @@ class OAIRequester:
             stats.calls += 1
             response = await session.post(self.url, headers=headers, json=body)
             stats.response_status_code = response.status
-            # capture utilization in all cases, if found
-            self._read_utilization(response, stats)
             if response.status != 429:
                 break
             if self.backoff and RETRY_AFTER_MS_HEADER in response.headers:
@@ -134,7 +129,7 @@ class OAIRequester:
                     logging.debug(f"retry-after sleeping for {retry_after_ms}ms")
                     await asyncio.sleep(retry_after_ms/1000.0)
                 except ValueError as e:
-                    logging.warning(f"unable to parse retry-after header value: {UTILIZATION_HEADER}={retry_after_str}: {e}")   
+                    logging.warning(f"unable to parse retry-after header value: {retry_after_str}: {e}")   
                     # fallback to backoff
                     break
             else:
@@ -195,17 +190,3 @@ class OAIRequester:
                         stats.generated_tokens += 1
             finally:
                 stats.response_end_time = time.time()
-
-    def _read_utilization(self, response: aiohttp.ClientResponse, stats: RequestStats):
-        if UTILIZATION_HEADER in response.headers:
-            util_str = response.headers[UTILIZATION_HEADER]
-            if len(util_str) == 0:
-                logging.warning(f"got empty utilization header {UTILIZATION_HEADER}")
-            elif util_str[-1] != '%':
-                logging.warning(f"invalid utilization header value: {UTILIZATION_HEADER}={util_str}")
-            else:
-                try:
-                    stats.deployment_utilization = float(util_str[:-1])
-                except ValueError as e:
-                    logging.warning(f"unable to parse utilization header value: {UTILIZATION_HEADER}={util_str}: {e}")            
-

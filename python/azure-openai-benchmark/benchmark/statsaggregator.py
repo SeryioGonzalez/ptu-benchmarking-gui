@@ -57,8 +57,7 @@ class _StatsAggregator(threading.Thread):
    token_latencies = _Samples()
    context_tokens = _Samples()
    generated_tokens = _Samples()
-   utilizations = _Samples()
-
+   
    raw_stat_dicts = list()
 
    def __init__(
@@ -161,8 +160,6 @@ class _StatsAggregator(threading.Thread):
                   )
                self.context_tokens._append(stats.request_start_time, stats.context_tokens)
                self.generated_tokens._append(stats.request_start_time, stats.generated_tokens)
-            if stats.deployment_utilization is not None:
-               self.utilizations._append(stats.request_start_time, stats.deployment_utilization)
          except Exception as e:
             exc_str = '\n'.join(traceback.format_exc().splitlines()[-3:])
             logging.error(f"error while aggregating request stats: {exc_str}")
@@ -256,4 +253,4 @@ class _StatsAggregator(threading.Thread):
          self.token_latencies._trim_oldest(self.window_duration)
          self.context_tokens._trim_oldest(self.window_duration)
          self.generated_tokens._trim_oldest(self.window_duration)
-         self.utilizations._trim_oldest(self.window_duration)
+         

@@ -33,7 +33,7 @@ class BenchmarkRequest(BaseModel):
     context_tokens: int
     max_tokens: int
     # Optional parameters with defaults
-    aggregation_window: Optional[int] = 5
+    aggregation_window: Optional[int] = 60
     clients: Optional[int] = 1
     output_format: str = "jsonl"
     prevent_server_caching: bool = True
