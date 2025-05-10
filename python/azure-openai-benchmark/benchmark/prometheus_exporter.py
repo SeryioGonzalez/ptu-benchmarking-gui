@@ -1,153 +1,63 @@
+"""
+Exports StatsAggregator's gauges via Prometheus.
+
+Importing this module has NO side-effects; call `start_exporter()` once near
+program start-up (e.g. right after you create StatsAggregator).
+"""
+
 from __future__ import annotations
+from typing import TYPE_CHECKING
+from prometheus_client import Gauge, CollectorRegistry, start_http_server
 
-import logging
-import re
-import threading
-import time
-from typing import Any, Dict, Iterable, Mapping, Tuple
+if TYPE_CHECKING:                       # avoid circular import at runtime
+    from .stats_aggregator import StatsAggregator
 
-from prometheus_client import Gauge, start_http_server
-
-_LOG = logging.getLogger(__name__)
-_METRICS: dict[str, Gauge] = {}
-_METRIC_NAME_RE = re.compile(r"[^a-zA-Z0-9_:]")
-
-###############################################################################
-# Helpers
-###############################################################################
+_PORT_DEFAULT = 9000
+_registry: CollectorRegistry | None = None
+_started: bool = False
 
 
-def _normalise_key(key: str, prefix: str = "app") -> str:
+def _gauge(name: str, description: str, value_fn):
     """
-    Turn an arbitrary key path into a Prometheus-safe metric name.
-
-    - everything to lower-case
-    - non [a-zA-Z0-9_:] chars => '_'
-    - prepend prefix
+    Helper that registers a Gauge whose value is taken from `value_fn`
+    every time Prometheus scrapes /metrics.
     """
-    cleaned = _METRIC_NAME_RE.sub("_", key.lower())
-    # Prometheus metric names may not start with a digit
-    if cleaned and cleaned[0].isdigit():
-        cleaned = f"_{cleaned}"
-    return f"{prefix}_{cleaned}"
+    return Gauge(
+        name,
+        description,
+        registry=_registry,
+        # ValueFuncGauge is created under the hood when 'callback' is given
+        # (see prometheus_client docs >= 0.20.0)
+        labelnames=(),
+        unit="",
+        callback=value_fn,
+    )
 
 
-def _flatten(d: Mapping[str, Any], path: Tuple[str, ...] = ()) -> Iterable[Tuple[str, Any]]:
+def start_exporter(stats: "StatsAggregator", port: int | None = None) -> None:
     """
-    Recursively flatten a mapping.
-
-    {"a": {"b": 1}} -> [("a.b", 1)]
+    Idempotent initialiser – safe to call multiple times; only the first call
+    does any work.
     """
-    for k, v in d.items():
-        new_path = (*path, k)
-        if isinstance(v, Mapping):
-            yield from _flatten(v, new_path)
-        else:
-            yield (".".join(new_path), v)
-
-
-def _numeric(value: Any) -> float | None:
-    """
-    Convert *value* to a float if possible, otherwise return None.
-    Accepts ints, floats, numeric strings; ignores "n/a", "", etc.
-    """
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        try:
-            return float(value)
-        except ValueError:
-            return None
-    return None
-
-
-###############################################################################
-# Export logic
-###############################################################################
-
-
-def _export_once(aggregator: Any) -> None:
-    """
-    Pull one snapshot from *aggregator* and update all gauges.
-    The aggregator must expose either:
-        • .latest()   -> Mapping
-        • .get_stats() -> Mapping
-        • .stats       (property) -> Mapping
-    First one that exists wins.
-    """
-    # 1. ----- obtain a stats snapshot --------------------------------------
-    for attr in ("latest", "get_stats", "stats"):
-        if hasattr(aggregator, attr):
-            snap = getattr(aggregator, attr)
-            snap = snap() if callable(snap) else snap
-            break
-    else:
-        raise AttributeError(
-            "statsaggregator exposes neither .latest(), .get_stats() nor .stats"
-        )
-
-    if not isinstance(snap, Mapping):
-        _LOG.warning("Expected mapping from aggregator, got %r – skipping", type(snap))
+    global _registry, _started
+    if _started:         # already running
         return
 
-    # 2. ----- flatten & export ---------------------------------------------
-    for key, val in _flatten(snap):
-        num = _numeric(val)
-        if num is None:
-            continue  # skip non-numeric values, e.g. "n/a"
-        mname = _normalise_key(key)
+    _registry = CollectorRegistry(auto_describe=True)
 
-        gauge = _METRICS.get(mname)
-        if gauge is None:
-            gauge = Gauge(mname, f"Automatically generated metric for '{key}'")
-            _METRICS[mname] = gauge
-        gauge.set(num)
+    # -----------------------------------------------------------------
+    # Create one Gauge per *public* attribute that StatsAggregator marks
+    # as exportable.  We use the convention: every attr in
+    # `stats.prometheus_gauges` is a (metric_name, help_text) tuple.
+    # -----------------------------------------------------------------
+    for attr_name, (metric_name, help_text) in stats.prometheus_gauges.items():
 
+        # Freeze `attr_name` in a new scope so every lambda has its own copy
+        def _make_value_fn(an=attr_name):
+            return lambda: getattr(stats, an)
 
-def _export_loop(aggregator: Any, interval: int) -> None:
-    """Daemon thread – periodically calls `_export_once`."""
-    _LOG.info("Prometheus exporter loop running every %ss", interval)
-    while True:
-        try:
-            _export_once(aggregator)
-        except Exception:  # noqa: BLE001
-            _LOG.exception("Exporter failed – continuing")
-        time.sleep(interval)
+        _gauge(metric_name, help_text, _make_value_fn())
 
-
-###############################################################################
-# Public bootstrap
-###############################################################################
-
-
-def start_metrics_exporter(
-    statsaggregator: Any,
-    *,
-    port: int = 8000,
-    interval: int = 5,
-    addr: str = "0.0.0.0",
-) -> None:
-    """
-    Start the exporter.
-
-    Parameters
-    ----------
-    statsaggregator
-        Object providing stats (see `_export_once` for required interface).
-    port
-        TCP port on which to serve `/metrics`.
-    interval
-        Seconds between aggregator scrapes.
-    addr
-        Bind address (defaults to 0.0.0.0).
-    """
-    start_http_server(port, addr)
-    _LOG.info("Prometheus /metrics endpoint listening on %s:%d", addr, port)
-
-    t = threading.Thread(
-        name="prometheus-exporter",
-        target=_export_loop,
-        args=(statsaggregator, interval),
-        daemon=True,
-    )
-    t.start()
+    # finally expose /metrics
+    start_http_server(port or _PORT_DEFAULT, registry=_registry)
+    _started = True
