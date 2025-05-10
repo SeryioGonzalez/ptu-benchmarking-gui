@@ -30,4 +30,3 @@ def start_exporter(stats_aggregator) -> None:
     logger.info(f"Starting Prometheus exporter on port {PROMETHEUS_PORT}")
     start_http_server(PROMETHEUS_PORT)
     logger.info(f"Prometheus exporter up on :{PROMETHEUS_PORT}/metrics")
-
