@@ -5,4 +5,5 @@ numpy
 backoff
 wonderwords
 asyncio
+ping3
 aiohttp
