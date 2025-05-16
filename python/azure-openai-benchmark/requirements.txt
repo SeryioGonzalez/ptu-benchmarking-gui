@@ -7,3 +7,7 @@ wonderwords
 asyncio
 ping3
 aiohttp
+Pillow
+prometheus_client
+uvicorn[standard]
+fastapi

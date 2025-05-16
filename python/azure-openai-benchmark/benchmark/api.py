@@ -133,3 +133,8 @@ def get_current_benchmark():
     if not current_job:
         raise HTTPException(status_code=404, detail="No benchmark has been started yet")
     return current_job
+
+@app.get("/status")
+def get_status():
+    logger.debug("fetching status")
+    return "ok"

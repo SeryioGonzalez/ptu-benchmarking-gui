@@ -5,4 +5,5 @@ ADD benchmark/ benchmark/
 ADD requirements.txt .
 RUN pip install -r requirements.txt --root-user-action=ignore
 
-ENTRYPOINT [ "python", "-m", "benchmark.bench" ]
+# Run Uvicorn with dynamic port
+CMD ["sh", "-c", "uvicorn benchmark.api:app --host 0.0.0.0 --port ${BENCHMARK_TOOL_API_PORT} --reload"]
