@@ -275,7 +275,7 @@ def _run_load(
       duration=duration
    )
    aggregator.stop()
-
+   set_metrics_provider(None)
    logging.info("finished load test")
 
 def _validate(args):
