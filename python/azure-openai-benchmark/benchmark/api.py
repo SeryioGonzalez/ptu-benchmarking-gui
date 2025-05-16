@@ -3,19 +3,19 @@ import logging
 import uuid
 from datetime import datetime
 from enum import Enum
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from threading import Lock
 from typing import Any, Optional
+
+from .loadcmd import load
+from .prometheus_exporter import start_exporter, set_metrics_provider
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
     force=True
 )
-
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-
-from .loadcmd import load
 
 # Define status lifecycle
 class BenchmarkStatus(str, Enum):
@@ -68,6 +68,24 @@ logger.info("Starting Azure OpenAI Benchmark API")
 # Only single job at a time
 todo_lock = Lock()
 current_job: Optional[BenchmarkJob] = None
+
+@app.on_event("startup")
+async def startup_event():
+    """
+    Run once when the FastAPI app starts.
+    Ensures the Prometheus exporter is always up.
+    """
+    start_exporter()                 # exporter keeps /metrics alive
+    set_metrics_provider(lambda: {}) # empty metrics until a run begins
+    logger.info("Startup completed – Prometheus exporter ready")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """
+    Optional: reset provider or perform clean-up.
+    """
+    set_metrics_provider(lambda: {})
+    logger.info("Shutdown – exporter left running with empty provider")
 
 @app.post("/benchmark", response_model=BenchmarkJob)
 async def start_benchmark(req: BenchmarkRequest):

@@ -253,3 +253,4 @@ class _StatsAggregator(threading.Thread):
          self.context_tokens._trim_oldest(self.window_duration)
          self.generated_tokens._trim_oldest(self.window_duration)
          
+   __call__ = get_latest_metrics

@@ -1,32 +1,46 @@
-import logging
-import os
-
+import logging, os
 from prometheus_client import REGISTRY, start_http_server
 from prometheus_client.core import GaugeMetricFamily
-from typing import Union
+from typing import Union, Callable
 
 logger = logging.getLogger(__name__)
 Number = Union[int, float]
+PROMETHEUS_PORT = int(os.getenv("BENCHMARK_TOOL_PROMETHEUS_METRIC_EXPORT_PORT", 9100))
 
-PROMETHEUS_PORT = int(os.getenv("PROMETHEUS_PORT", 9100))
+# 👉 the current stats provider (callable returning a dict) can be hot-swapped
+_current_metrics_provider: Callable[[], dict] | None = None
+_exporter_started = False
 
-def start_exporter(stats_aggregator) -> None:
+
+class _StatsCollector:
+    def collect(self):
+        if _current_metrics_provider is None:
+            return
+        for name, value in _current_metrics_provider().items():
+            if isinstance(value, (int, float)):
+                g = GaugeMetricFamily(name, f"{name} (auto)", labels=["label"])
+                g.add_metric(["load"], value)        # generic label
+                yield g
+
+
+def set_metrics_provider(provider: Callable[[], dict] | None):
     """
-    Expose `stats_aggregator.get_latest_metrics()` at /metrics.
-    Call once, soon after you create the StatsAggregator instance.
+    Point the collector at a new stats provider (or None for idle state).
     """
+    global _current_metrics_provider
+    _current_metrics_provider = provider
 
-    class _StatsCollector:
-        def collect(self):
-            for name, value in stats_aggregator.get_latest_metrics().items():
-                if isinstance(value, (int, float)):       # skip timestamp str
-                    g = GaugeMetricFamily(name, f"{name} (auto)", labels=["label"])
-                    g.add_metric([stats_aggregator.custom_label], value)
-                    yield g
 
-    logger.info(f"Registering Prometheus collector with label {stats_aggregator.custom_label}")    
+def start_exporter() -> None:
+    """
+    Fire up the exporter once.  Subsequent calls are ignored.
+    """
+    global _exporter_started
+    if _exporter_started:
+        logger.debug("Prometheus exporter already running")
+        return
+
     REGISTRY.register(_StatsCollector())
-
-    logger.info(f"Starting Prometheus exporter on port {PROMETHEUS_PORT}")
     start_http_server(PROMETHEUS_PORT)
+    _exporter_started = True
     logger.info(f"Prometheus exporter up on :{PROMETHEUS_PORT}/metrics")
