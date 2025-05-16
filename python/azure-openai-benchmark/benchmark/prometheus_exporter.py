@@ -16,10 +16,11 @@ class _StatsCollector:
     def collect(self):
         if _current_metrics_provider is None:
             return
+        label = _current_metrics_provider()['label']
         for name, value in _current_metrics_provider().items():
             if isinstance(value, (int, float)):
                 g = GaugeMetricFamily(name, f"{name} (auto)", labels=["label"])
-                g.add_metric(["load"], value)        # generic label
+                g.add_metric([label], value)        # generic label
                 yield g
 
 

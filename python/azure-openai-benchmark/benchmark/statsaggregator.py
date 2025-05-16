@@ -212,6 +212,7 @@ class _StatsAggregator(threading.Thread):
          processing_requests_count = min(self.clients, self.processing_requests_count)
          
          self._latest_metrics = {
+            "label": self.custom_label if self.custom_label else "default",
             "run_seconds": run_seconds,
             "timestamp": timestamp,  # kept as-is for logging, not exported as a metric
             "rpm": rpm,
